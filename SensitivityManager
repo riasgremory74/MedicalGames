@@ -1,0 +1,75 @@
+using UnityEngine;
+
+public class InputSensitivityManager : MonoBehaviour
+{
+    public static InputSensitivityManager instance;
+
+    public enum Difficulty { Easy, Medium, Hard }
+    public Difficulty selectedDifficulty = Difficulty.Medium;
+
+    public float sensitivityMultiplier { get; private set; }
+    public float Deadzone { get; private set; }
+
+    void Awake()
+    {
+        if (instance == null)
+        {
+            instance = this;
+            DontDestroyOnLoad(gameObject);
+            LoadDifficulty();
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    public void SetDifficulty(int index)
+    {
+        selectedDifficulty = (Difficulty)index;
+        PlayerPrefs.SetInt("SelectedDifficulty", index);
+        PlayerPrefs.Save();
+        SetSensitivity();
+    }
+
+    private void LoadDifficulty()
+    {
+        int savedIndex = PlayerPrefs.GetInt("SelectedDifficulty", 1); // Medium by default
+        selectedDifficulty = (Difficulty)savedIndex;
+        SetSensitivity();
+    }
+
+    private void SetSensitivity()
+    {
+        switch (selectedDifficulty)
+        {
+            case Difficulty.Easy:
+                sensitivityMultiplier = 1.3f;
+                Deadzone = 0.2f;
+                break;
+            case Difficulty.Medium:
+                sensitivityMultiplier = 1.1f;
+                Deadzone = 0.1f;
+                break;
+            case Difficulty.Hard:
+                sensitivityMultiplier = 1f;
+                Deadzone = 0.01f;
+                break;
+        }
+    }
+
+    public void ResetInputs()
+    {
+        selectedDifficulty = Difficulty.Medium;
+        SetSensitivity();
+    }
+
+    public float GetAdjustedInput(float inputValue)
+    {
+        float clampedInput = Mathf.Clamp(inputValue, -1f, 1f);
+        if (Mathf.Abs(clampedInput) <= Deadzone)
+            return 0f;
+        else
+            return clampedInput;
+    }
+}

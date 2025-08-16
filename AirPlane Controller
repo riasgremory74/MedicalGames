@@ -1,0 +1,142 @@
+using UnityEngine;
+using TMPro;
+using System.Collections;
+
+namespace HeneGames.Airplane
+{
+    public class SimpleAirPlaneController : MonoBehaviour
+    {
+        public enum AirplaneState { Idle, Flying }
+
+        [Header("Debug")]
+        public TMP_Text debugText;
+
+        [Header("Movement Settings")]
+        public float speed = 20f;
+        public float yawSpeed = 8f;
+        public float verticalSpeed = 5f;
+
+        [Header("Input")]
+        public string horizontalInputAxis = "Horizontal";
+        public string verticalInputAxis = "Vertical";
+
+        [Header("Angle Limits (Editable Per Level)")]
+        public float maxYawAngle = 20f;
+        public float maxPitchAmount = 2.5f;
+
+        [Header("Height Clamping")]
+        public float minHeight = 20f;
+        public float maxHeight = 90f;
+
+        [Header("Horizon Clamping (world X)")]
+        public float minHorizon = -50f;
+        public float maxHorizon = 50f;
+
+        [Header("UI")]
+        public TMP_Text countdownText;
+        public float countdownTime = 3f;
+
+        [Header("Smoothing")]
+        public float responsiveness = 8f;
+
+        private float yawInput, verticalInput;
+        private bool isCountdownActive = true;
+        private AirplaneState airplaneState = AirplaneState.Idle;
+
+        void Start()
+        {
+            StartCoroutine(StartCountdown());
+        }
+
+        void Update()
+        {
+            if (isCountdownActive || airplaneState == AirplaneState.Idle)
+            {
+                yawInput = 0f;
+                verticalInput = 0f;
+                return;
+            }
+
+            ApplyPlayerSteering();
+            MoveForward();
+        }
+
+        void MoveForward()
+        {
+            transform.position += transform.forward * speed * Time.deltaTime;
+        }
+
+        void ApplyPlayerSteering()
+        {
+            // --- read raw / keyboard override ---
+            float rawYawInput = Input.GetAxis(horizontalInputAxis);
+            float rawVerticalInput = Input.GetAxis(verticalInputAxis);
+
+            float combinedYaw = Input.GetKey(KeyCode.A) ? -1f :
+                                Input.GetKey(KeyCode.D) ? 1f :
+                                rawYawInput;
+
+            float combinedVertical = Input.GetKey(KeyCode.W) ? 1f :
+                                     Input.GetKey(KeyCode.S) ? -1f :
+                                     rawVerticalInput;
+
+            
+            float clampedYaw = Mathf.Clamp(combinedYaw, -1f, 1f);
+            float clampedVertical = Mathf.Clamp(combinedVertical, -1f, 1f);
+
+            // Optional sensitivity manager
+            var sens = InputSensitivityManager.instance;
+            float adjustedYaw = sens != null ? sens.GetAdjustedInput(clampedYaw) : clampedYaw;
+            float adjustedVertical = sens != null ? sens.GetAdjustedInput(clampedVertical) : clampedVertical;
+
+            // Smooth input
+            float lerpFactor = 1f - Mathf.Exp(-responsiveness * Time.deltaTime);
+            yawInput = Mathf.Lerp(yawInput, adjustedYaw, lerpFactor);
+            verticalInput = Mathf.Lerp(verticalInput, adjustedVertical, lerpFactor);
+
+            float lateralAmount = yawInput * yawSpeed * Time.deltaTime;
+            float verticalAmount = verticalInput * verticalSpeed * Time.deltaTime;
+            verticalAmount = Mathf.Clamp(verticalAmount, -maxPitchAmount, maxPitchAmount);
+
+            Vector3 pos = transform.position;
+            pos.x = Mathf.Clamp(pos.x + lateralAmount, minHorizon, maxHorizon);
+            pos.y = Mathf.Clamp(pos.y + verticalAmount, minHeight, maxHeight);
+            transform.position = pos;
+
+            // Debug text
+            if (debugText != null)
+            {
+                debugText.text =
+                  $"{rawYawInput:F2}\n" +
+                  $"{rawVerticalInput:F2}";
+            }
+        }
+
+        public void ResetInputs()
+        {
+            yawInput = 0f;
+            verticalInput = 0f;
+        }
+
+        IEnumerator StartCountdown()
+        {
+            airplaneState = AirplaneState.Idle;
+            isCountdownActive = true;
+
+            float timeRemaining = countdownTime;
+            while (timeRemaining > 0)
+            {
+                if (countdownText != null) countdownText.text = Mathf.Ceil(timeRemaining).ToString();
+                yield return new WaitForSeconds(1f);
+                timeRemaining--;
+            }
+
+            if (countdownText != null) countdownText.text = "GO!";
+            yield return new WaitForSeconds(1f);
+
+            if (countdownText != null) countdownText.gameObject.SetActive(false);
+            isCountdownActive = false;
+            airplaneState = AirplaneState.Flying;
+        }
+    }
+}
