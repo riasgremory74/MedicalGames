@@ -1,0 +1,89 @@
+using System.Collections;
+using UnityEngine;
+using TMPro;
+
+namespace HeneGames.Inputs
+{
+    public enum Axis2D { Horizontal, Vertical }
+
+    public class InputCalibrator : MonoBehaviour
+    {
+        [Header("Debug UI")]
+        public TMP_Text calibrationDebugText;
+
+        [Header("Calibration Settings")]
+        public float calibrationDuration = 3f;
+
+        private float centerHorizontal;
+        private float centerVertical;
+        private bool isCalibrating;
+
+        private void Start()
+        {
+            if (calibrationDebugText != null)
+                calibrationDebugText.text = "Starting calibration...";
+
+            StartCoroutine(Calibrate());
+
+            //while (1)
+            //{
+            //    if (checked start or reset flag)
+            //        {
+            //        StartCoroutine(Calibrate());
+            //        }
+            //}
+
+        }
+
+        public IEnumerator Calibrate()
+        {
+            isCalibrating = true;
+
+            float timer = 0f;
+            float sumH = 0f;
+            float sumV = 0f;
+            int samples = 0;
+
+            while (timer < calibrationDuration)
+            {
+                float h = UnityEngine.Input.GetAxis("Horizontal");
+                float v = UnityEngine.Input.GetAxis("Vertical");
+
+                sumH += h;
+                sumV += v;
+                samples++;
+
+                timer += Time.deltaTime;
+
+                if (calibrationDebugText != null)
+                    calibrationDebugText.text = $"Calibrating... {timer:F1}/{calibrationDuration}s";
+
+                yield return null;
+            }
+
+            centerHorizontal = sumH / samples;
+            centerVertical = sumV / samples;
+            isCalibrating = false;
+
+            if (calibrationDebugText != null)
+                calibrationDebugText.text = $"Calibration Complete\nCenter: H={centerHorizontal:F2} V={centerVertical:F2}";
+        }
+
+
+        public float GetCalibratedAxis(Axis2D axis)
+        {
+            float value = 0f;
+            switch (axis)
+            {
+                case Axis2D.Horizontal:
+                    value = UnityEngine.Input.GetAxis("Horizontal") - centerHorizontal;
+                    break;
+                case Axis2D.Vertical:
+                    value = UnityEngine.Input.GetAxis("Vertical") - centerVertical;
+                    break;
+            }
+            return value;
+        }
+    }
+
+}
