@@ -1,0 +1,75 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+public class JoystickHUD : MonoBehaviour
+{
+    [Header("Input")]
+    public string horizontalAxis = "Horizontal";
+    public string verticalAxis = "Vertical";
+    [Tooltip("Clamp raw input to -1..1 before drawing")]
+    public bool clampInput = true;
+    public float deadzone = 0.05f;
+
+    [Header("UI")]
+    public RectTransform circleArea;    // The circular UI RectTransform (Image)
+    public RectTransform dot;           // The small dot RectTransform (child of circleArea)
+    public TextMeshProUGUI coordsText;  // optional numeric readout (X, Y)
+
+    [Header("Smoothing")]
+    public bool smooth = true;
+    [Tooltip("Higher = faster follow")]
+    public float smoothSpeed = 12f;
+
+    Vector2 targetPos;
+    Vector2 currentPos;
+
+    void Reset()
+    {
+        // helpful defaults if you add the component and forget to set fields
+        circleArea = GetComponent<RectTransform>();
+    }
+
+    void Update()
+    {
+        if (circleArea == null || dot == null)
+            return;
+
+        // read input
+        float rawX = UnityEngine.Input.GetAxis(horizontalAxis);
+        float rawY = UnityEngine.Input.GetAxis(verticalAxis);
+
+        if (clampInput)
+        {
+            rawX = Mathf.Clamp(rawX, -1f, 1f);
+            rawY = Mathf.Clamp(rawY, -1f, 1f);
+        }
+
+        // deadzone
+        Vector2 raw = new Vector2(rawX, rawY);
+        if (raw.magnitude < deadzone) raw = Vector2.zero;
+
+        Vector2 rawInput = new Vector2(raw.x, raw.y);
+        if (rawInput.magnitude > 1f)
+            rawInput.Normalize(); // clamp inside unit circle
+
+        // map to UI circle
+        float radius = Mathf.Min(circleArea.rect.width, circleArea.rect.height) * 0.5f;
+        targetPos = rawInput * radius;
+
+        // smoothing
+        if (smooth)
+            currentPos = Vector2.Lerp(currentPos, targetPos, 1f - Mathf.Exp(-smoothSpeed * Time.deltaTime));
+        else
+            currentPos = targetPos;
+
+        // apply to dot (local anchored position)
+        dot.anchoredPosition = currentPos;
+
+        // optional numeric display
+        if (coordsText != null)
+        {
+            coordsText.text = $"X: {raw.x:F2}\nY: {raw.y:F2}";
+        }
+    }
+}
